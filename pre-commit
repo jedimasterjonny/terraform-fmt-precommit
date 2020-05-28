@@ -1,0 +1,27 @@
+#!/bin/bash
+
+if git rev-parse --verify HEAD >/dev/null 2>&1
+then
+	against=HEAD
+else
+  	# Initial commit: diff against an empty tree object
+	against=$(git hash-object -t tree /dev/null)
+fi
+
+# Redirect output to stderr
+exec 1>&2
+
+# Check added, changed, modified files
+git diff --name-only --diff-filter=ACM "$against" -- '*.tf' '*.tfvars' |\
+ xargs -n1 terraform fmt -check=true -write=false > /dev/null
+
+if [ "${PIPESTATUS[1]}" != 0 ]
+then
+cat <<\EOF
+Error: Terraform source has not been formatted.
+
+Please run `terraform fmt` across all files that are part of this commit, then
+try committing again.
+EOF
+	exit 1
+fi
